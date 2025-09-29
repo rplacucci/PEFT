@@ -3,18 +3,23 @@ import time
 import argparse
 import torch
 import evaluate
+import warnings
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 from datasets import load_dataset
-from transformers import BertForSequenceClassification, BertTokenizer, DataCollatorWithPadding, get_scheduler
+from transformers import BertForSequenceClassification, BertTokenizer, DataCollatorWithPadding, logging, get_scheduler
+
+# Disable warnings
+logging.set_verbosity_error()
+warnings.filterwarnings("ignore", category=UserWarning)
 
 # Config argparser
 parser = argparse.ArgumentParser(description="Fine-tune BERT on a GLUE task (vanilla)")
 parser.add_argument("--checkpoint", type=str, default="bert-base-uncased", help="Checkpoint of pre-trained BERT model")
 parser.add_argument("--task_name", type=str, default="qqp", help="Name of the GLUE task to train on", choices=["mnli", "qqp", "qnli", "sst2", "cola", "stsb", "mrpc", "rte", "wnli"])
 parser.add_argument("--lr", type=float, default=1e-4, help="Maximum learning rate for the optimizer")
-parser.add_argument("--betas", nargs=2, type=int, default=(0.9, 0.999), help="Beta values for the optimizer")
+parser.add_argument("--betas", nargs=2, type=float, default=(0.9, 0.999), help="Beta values for the optimizer")
 parser.add_argument("--eps", type=float, default=1e-6, help="Constant to stabilize division in the optimizer update rule")
 parser.add_argument("--weight_decay", type=float, default=1e-2, help="Weight decay for the optimizer")
 parser.add_argument("--batch_size", type=int, default=32, help="Size of batch to train with")
@@ -32,15 +37,23 @@ batch_size = args.batch_size
 warmup_ratio = args.warmup_ratio
 n_epochs = args.n_epochs
 
-# Config directory
+# Config directories
+log_dir = f"./logs/baseline"
+os.makedirs(log_dir, exist_ok=True)
+
 out_dir = f"./models/baseline/{task_name}"
 os.makedirs(out_dir, exist_ok=True)
-model_save_path = os.path.join(out_dir, f"bert-base-glue-{task_name}-batch_size-{batch_size}-lr-{lr:.0e}")
+model_save_path = os.path.join(out_dir, f"bert-base-glue-{task_name}-batch_size-{batch_size}-lr-{lr:.0e}-n_epochs-{n_epochs}")
 
 # Config distributed training with accelerate
-accelerator = Accelerator(log_with="tensorboard", project_dir="./logs/baseline")
+accelerator = Accelerator(
+    log_with=["tensorboard"],
+    project_dir=log_dir,
+    device_placement=True
+)
+accelerator.init_trackers(f"bert-base-glue-{task_name}-batch_size-{batch_size}-lr-{lr:.0e}-n_epochs-{n_epochs}")
 world_size = accelerator.num_processes
-print(f"Initialized {accelerator.__class__.__name} with {world_size} distributed processes")
+accelerator.print(f"Initialized {accelerator.__class__.__name__} with {world_size} distributed processes")
 
 # Set seeds for reproducibility
 torch.manual_seed(42)
@@ -50,16 +63,17 @@ torch.set_float32_matmul_precision("high")
 # Config tokenizer
 tokenizer = BertTokenizer.from_pretrained(checkpoint)
 vocab_size = tokenizer.vocab_size
-print(f"Loaded {tokenizer.__class__.__name__} with vocab size {vocab_size:,}")
+accelerator.print(f"Loaded {tokenizer.__class__.__name__} with vocab size {vocab_size:,}")
 
 # Config model
 num_labels = 3 if task_name in ("mnli", "ax") else 1 if task_name == "stsb" else 2
 model = BertForSequenceClassification.from_pretrained(checkpoint,num_labels=num_labels)
-print(f"Loaded {model.__class__.__name__} with {num_labels} labels and {sum(p.numel() for p in model.parameters() if p.requires_grad):,} trainable parameters")
+accelerator.print(f"Loaded {model.__class__.__name__} with {num_labels} labels and {sum(p.numel() for p in model.parameters() if p.requires_grad):,} trainable parameters")
 
 # Load dataset
 glue = load_dataset("glue", task_name)
-print(f"Loaded GLUE {task_name} with {sum([len(glue[split]) for split in ["train", "validation"]]):,} train/val sequences")
+valid_split = "validation_matched" if task_name == "mnli" else "validation"
+accelerator.print(f"Loaded GLUE {task_name} with {sum([len(glue[split]) for split in ["train", valid_split]]):,} train/val sequences")
 
 def tokenize_fn(example, task_name):
     if task_name in ("ax", "mnli"):
@@ -92,7 +106,7 @@ def postprocess_fn(dataset, task_name):
     dataset.set_format("torch")
     return dataset
 
-dataset = glue.map(tokenize_fn, batched=True)
+dataset = glue.map(tokenize_fn, batched=True, fn_kwargs={"task_name": task_name})
 dataset = postprocess_fn(dataset, task_name)
 
 # Prepare dataloaders
@@ -104,8 +118,9 @@ train_dataloader = DataLoader(
     shuffle=True,
     collate_fn=collate_fn
 )
+
 valid_dataloader = DataLoader(
-    dataset=dataset["validation"],
+    dataset=dataset[valid_split],
     batch_size=batch_size,
     shuffle=False,
     collate_fn=collate_fn
@@ -168,11 +183,9 @@ for epoch in range(n_epochs):
         )
 
         # Print to terminal
-        if step % 10 == 0:
-            accelerator.print(f"(train) epoch: {epoch:2d} | step: {step:4d} | loss: {loss:.4f} | lr: {lr:.4e} | norm: {norm:.4f} | tok/sec: {tokens_per_sec:,}")
+        accelerator.print(f"(train) epoch: {epoch:2d} | step: {step:4d} | loss: {loss:.4f} | lr: {lr:.4e} | norm: {norm:.4f} | tok/sec: {tokens_per_sec:,}")
 
     model.eval()
-    metric.reset()
     for batch in valid_dataloader:
         with torch.no_grad():
             outputs = model(**batch)
@@ -210,4 +223,4 @@ accelerator.print(f"Model saved to {model_save_path}")
 
 # Flush trackers
 accelerator.end_training()
-print("Goodbye!")
+accelerator.print("Goodbye!")
