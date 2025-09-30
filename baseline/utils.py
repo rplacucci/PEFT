@@ -10,7 +10,7 @@ def tokenize_fn(example, task_name, tokenizer):
     else:
         return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
 
-def postprocess_fn(dataset, task_name):
+def postprocess_fn(dataset, task_name, test=False):
     # Remove unnecessary columns based on the task
     columns_to_remove = ["idx"]
     if task_name in ("ax", "mnli", "mnli-m", "mnli-mm"):
@@ -23,8 +23,12 @@ def postprocess_fn(dataset, task_name):
         columns_to_remove.extend(["sentence"])
     else:  # mrpc, rte, wnli, stsb
         columns_to_remove.extend(["sentence1", "sentence2"])
+
+    if test:
+        columns_to_remove.append("label")
+    else:
+        dataset = dataset.rename_column("label", "labels")
     
     dataset = dataset.remove_columns(columns_to_remove)
-    dataset = dataset.rename_column("label", "labels")
     dataset.set_format("torch")
     return dataset
