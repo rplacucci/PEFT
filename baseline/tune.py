@@ -9,6 +9,9 @@ from torch.utils.data import DataLoader
 from accelerate import Accelerator
 from datasets import load_dataset
 from transformers import BertForSequenceClassification, BertTokenizer, DataCollatorWithPadding, logging, get_scheduler
+from .utils import tokenize_fn, postprocess_fn
+
+# accelerate launch -m baseline.tune 
 
 # Disable warnings
 logging.set_verbosity_error()
@@ -38,12 +41,12 @@ warmup_ratio = args.warmup_ratio
 n_epochs = args.n_epochs
 
 # Config directories
-log_dir = f"./logs/baseline"
+log_dir = f"./logs/baseline/{task_name}"
 os.makedirs(log_dir, exist_ok=True)
 
 out_dir = f"./models/baseline/{task_name}"
 os.makedirs(out_dir, exist_ok=True)
-model_save_path = os.path.join(out_dir, f"bert-base-glue-{task_name}-batch_size-{batch_size}-lr-{lr:.0e}-n_epochs-{n_epochs}")
+model_save_path = os.path.join(out_dir, f"{checkpoint}-glue-{task_name}-batch_size-{batch_size}-lr-{lr:.0e}-n_epochs-{n_epochs}")
 
 # Config distributed training with accelerate
 accelerator = Accelerator(
@@ -51,7 +54,7 @@ accelerator = Accelerator(
     project_dir=log_dir,
     device_placement=True
 )
-accelerator.init_trackers(f"bert-base-glue-{task_name}-batch_size-{batch_size}-lr-{lr:.0e}-n_epochs-{n_epochs}")
+accelerator.init_trackers(f"{checkpoint}-glue-{task_name}-batch_size-{batch_size}-lr-{lr:.0e}-n_epochs-{n_epochs}")
 world_size = accelerator.num_processes
 accelerator.print(f"Initialized {accelerator.__class__.__name__} with {world_size} distributed processes")
 
@@ -67,7 +70,7 @@ accelerator.print(f"Loaded {tokenizer.__class__.__name__} with vocab size {vocab
 
 # Config model
 num_labels = 3 if task_name in ("mnli", "ax") else 1 if task_name == "stsb" else 2
-model = BertForSequenceClassification.from_pretrained(checkpoint,num_labels=num_labels)
+model = BertForSequenceClassification.from_pretrained(checkpoint, num_labels=num_labels)
 accelerator.print(f"Loaded {model.__class__.__name__} with {num_labels} labels and {sum(p.numel() for p in model.parameters() if p.requires_grad):,} trainable parameters")
 
 # Load dataset
@@ -75,38 +78,7 @@ glue = load_dataset("glue", task_name)
 valid_split = "validation_matched" if task_name == "mnli" else "validation"
 accelerator.print(f"Loaded GLUE {task_name} with {sum([len(glue[split]) for split in ["train", valid_split]]):,} train/val sequences")
 
-def tokenize_fn(example, task_name):
-    if task_name in ("ax", "mnli"):
-        return tokenizer(example["premise"], example["hypothesis"], truncation=True)
-    elif task_name == "qqp":
-        return tokenizer(example["question1"], example["question2"], truncation=True)
-    elif task_name == "qnli":
-        return tokenizer(example["question"], example["sentence"], truncation=True)
-    elif task_name in ("sst2", "cola"):
-        return tokenizer(example["sentence"], truncation=True)
-    else:
-        return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
-
-def postprocess_fn(dataset, task_name):
-    # Remove unnecessary columns based on the task
-    columns_to_remove = ["idx"]
-    if task_name in ("ax", "mnli"):
-        columns_to_remove.extend(["premise", "hypothesis"])
-    elif task_name == "qqp":
-        columns_to_remove.extend(["question1", "question2"])
-    elif task_name == "qnli":
-        columns_to_remove.extend(["question", "sentence"])
-    elif task_name in ("sst2", "cola"):
-        columns_to_remove.extend(["sentence"])
-    else:  # mrpc, rte, wnli, stsb
-        columns_to_remove.extend(["sentence1", "sentence2"])
-    
-    dataset = dataset.remove_columns(columns_to_remove)
-    dataset = dataset.rename_column("label", "labels")
-    dataset.set_format("torch")
-    return dataset
-
-dataset = glue.map(tokenize_fn, batched=True, fn_kwargs={"task_name": task_name})
+dataset = glue.map(tokenize_fn, batched=True, fn_kwargs={"task_name": task_name, "tokenizer": tokenizer})
 dataset = postprocess_fn(dataset, task_name)
 
 # Prepare dataloaders
