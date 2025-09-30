@@ -1,0 +1,101 @@
+[
+  {
+    "task": "The Corpus of Linguistic Acceptability",
+    "alias": "cola",
+    "matthews_correlation": 49.1,
+    "accuracy": null,
+    "f1": null,
+    "pearson": null,
+    "spearmanr": null
+  },
+  {
+    "task": "The Stanford Sentiment Treebank",
+    "alias": "sst2",
+    "matthews_correlation": null,
+    "accuracy": 93.9,
+    "f1": null,
+    "pearson": null,
+    "spearmanr": null
+  },
+  {
+    "task": "Microsoft Research Paraphrase Corpus",
+    "alias": "mrpc",
+    "matthews_correlation": null,
+    "accuracy": 83.5,
+    "f1": 88.0,
+    "pearson": null,
+    "spearmanr": null
+  },
+  {
+    "task": "Semantic Textual Similarity Benchmark",
+    "alias": "stsb",
+    "matthews_correlation": null,
+    "accuracy": null,
+    "f1": null,
+    "pearson": 84.0,
+    "spearmanr": 82.5
+  },
+  {
+    "task": "Quora Question Pairs",
+    "alias": "qqp",
+    "matthews_correlation": null,
+    "accuracy": 89.3,
+    "f1": 71.6,
+    "pearson": null,
+    "spearmanr": null
+  },
+  {
+    "task": "MultiNLI Matched",
+    "alias": "mnli-m",
+    "matthews_correlation": null,
+    "accuracy": 84.3,
+    "f1": null,
+    "pearson": null,
+    "spearmanr": null
+  },
+  {
+    "task": "MultiNLI Mismatched",
+    "alias": "mnli-mm",
+    "matthews_correlation": null,
+    "accuracy": 83.9,
+    "f1": null,
+    "pearson": null,
+    "spearmanr": null
+  },
+  {
+    "task": "Question NLI",
+    "alias": "qnli",
+    "matthews_correlation": null,
+    "accuracy": 91.0,
+    "f1": null,
+    "pearson": null,
+    "spearmanr": null
+  },
+  {
+    "task": "Recognizing Textual Entailment",
+    "alias": "rte",
+    "matthews_correlation": null,
+    "accuracy": 63.5,
+    "f1": null,
+    "pearson": null,
+    "spearmanr": null
+  },
+  {
+    "task": "Winograd NLI",
+    "alias": "wnli",
+    "matthews_correlation": null,
+    "accuracy": 56.2,
+    "f1": null,
+    "pearson": null,
+    "spearmanr": null
+  },
+  {
+    "task": "Diagnostics Main",
+    "alias": "ax",
+    "matthews_correlation": 36.7,
+    "accuracy": null,
+    "f1": null,
+    "pearson": null,
+    "spearmanr": null
+  }
+]
