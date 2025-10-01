@@ -20,23 +20,19 @@ done
 
 # List of learning rates to tune with
 LRS=(
-    1e-5
-    2e-5
-    3e-5
-    5e-5
+    1e-4
+    1e-3
 )
 
 # List of batch sizes to tune with
 BSS=(
-    16
     32
 )
 
 # List of epochs to tune with
 EPOCHS=(
-    2
     3
-    4
+    20
 )
 
 # List of GLUE tasks to tune
@@ -54,7 +50,6 @@ TASKS=(
 
 # List of bottleneck sizes
 BOTTLENECKS=(
-    8
     64
     256
 )
