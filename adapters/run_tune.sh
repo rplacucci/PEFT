@@ -20,59 +20,59 @@ done
 
 # List of learning rates to tune with
 LRS=(
-  1e-5
-  2e-5
-  3e-5
-  5e-5
+    1e-5
+    2e-5
+    3e-5
+    5e-5
 )
 
 # List of batch sizes to tune with
 BSS=(
-  16
-  32
+    16
+    32
 )
 
 # List of epochs to tune with
 EPOCHS=(
-  2
-  3
-  4
+    2
+    3
+    4
 )
 
 # List of GLUE tasks to tune
 TASKS=(
-  cola
-  mnli
-  mrpc
-  qqp
-  qnli
-  rte
-  sst2
-  stsb
-  wnli
+    cola
+    mnli
+    mrpc
+    qqp
+    qnli
+    rte
+    sst2
+    stsb
+    wnli
 )
 
 # List of bottleneck sizes
 BOTTLENECKS=(
-  8
-  64
-  256
+    8
+    64
+    256
 )
 
 # Loop over each task and invoke accelerate launch
 for TASK in "${TASKS[@]}"; do
-  for LR in "${LRS[@]}"; do
-    for BS in "${BSS[@]}"; do
-      for BOTTLENECK in "${BOTTLENECKS[@]}"; do
-        for EPOCH in "${EPOCHS[@]}"; do
-            echo "================================================================================================================================================="
-            echo " Running GLUE adepter-based tuning on $TASK for checkpoint $CHECKPOINT with lr=$LR, batch_size=$BS, n_epochs=$EPOCH, bottleneck_size=$BOTTLENECK "
-            echo "================================================================================================================================================="
-            accelerate launch -m adepters.tune --checkpoint "$CHECKPOINT" --task_name "$TASK" --bottleneck_size "$BOTTLENECK" --lr "$LR" --batch_size "$BS" --n_epochs "$EPOCH"
+    for LR in "${LRS[@]}"; do
+        for BS in "${BSS[@]}"; do
+            for BOTTLENECK in "${BOTTLENECKS[@]}"; do
+                for EPOCH in "${EPOCHS[@]}"; do
+                    echo "================================================================================================================================================="
+                    echo " Running GLUE adapter-based tuning on $TASK for checkpoint $CHECKPOINT with lr=$LR, batch_size=$BS, n_epochs=$EPOCH, bottleneck_size=$BOTTLENECK "
+                    echo "================================================================================================================================================="
+                    accelerate launch -m adapters.tune --checkpoint "$CHECKPOINT" --task_name "$TASK" --bottleneck_size "$BOTTLENECK" --lr "$LR" --batch_size "$BS" --n_epochs "$EPOCH"
+                done
+            done
         done
-      done
     done
-  done
 done
 
-echo "Done tuning $CHECKPOINT!"
+echo "Done tuning $CHECKPOINT with adapters!"

@@ -20,25 +20,25 @@ done
 
 # List of GLUE tasks to evaluate
 TASKS=(
-  cola
-  mnli-m
-  mnli-mm
-  mrpc
-  qqp
-  qnli
-  rte
-  sst2
-  stsb
-  wnli
-  ax
+	cola
+	mnli-m
+	mnli-mm
+	mrpc
+	qqp
+	qnli
+	rte
+	sst2
+	stsb
+	wnli
+	ax
 )
 
 # Loop over each task and invoke accelerate launch
 for TASK in "${TASKS[@]}"; do
-  echo "============================================================"
-  echo " Running GLUE test on $TASK for checkpoint $CHECKPOINT "
-  echo "============================================================"
-  accelerate launch -m baseline.test --checkpoint "$CHECKPOINT" --task_name "$TASK"
+	echo "============================================================"
+	echo " Running GLUE test on $TASK for checkpoint $CHECKPOINT "
+	echo "============================================================"
+	accelerate launch -m baseline.test --checkpoint "$CHECKPOINT" --task_name "$TASK"
 done
 
 # Once all tasks are done, zip up the submission folder
