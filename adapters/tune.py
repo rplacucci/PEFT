@@ -9,9 +9,9 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 from datasets import load_dataset
-from transformers import BertForSequenceClassification, BertTokenizer, DataCollatorWithPadding, logging, get_scheduler
+from transformers import BertTokenizer, DataCollatorWithPadding, logging, get_scheduler
 from .utils import tokenize_fn, postprocess_fn
-from .adapter import Adapter, add_adapters
+from .adapter import BertWithAdapters
 
 # accelerate launch -m adapters.tune 
 
@@ -79,44 +79,10 @@ accelerator.print(f"Loaded {tokenizer.__class__.__name__} with vocab size {vocab
 
 # Config model
 num_labels = 3 if task_name in ("mnli", "ax") else 1 if task_name == "stsb" else 2
-model = BertForSequenceClassification.from_pretrained(checkpoint, num_labels=num_labels)
-total_params = sum(p.numel() for p in model.bert.parameters() if p.requires_grad)
-accelerator.print(f"Loaded {model.__class__.__name__} with {num_labels} labels and {total_params:,} encoder parameters")
-
-# Add adapter
-model = add_adapters(model, bottleneck_size)
-accelerator.print(f"Added adapters with bottleneck size {bottleneck_size}")
-
-# Freeze everything
-for p in model.parameters():
-    p.requires_grad = False
-
-# Unfreeze adapters
-adapter_trainable = 0
-for name, module in model.named_modules():
-    if isinstance(module, Adapter):
-        for p in module.parameters():
-            p.requires_grad = True
-            adapter_trainable += p.numel()
-
-# Unfreeze all LayerNorm parameters
-ln_trainable = 0
-for m in model.modules():
-    if isinstance(m, nn.LayerNorm):
-        for p in m.parameters():
-            if not p.requires_grad:
-                p.requires_grad = True
-                ln_trainable += p.numel()
-
-# Unfreeze classification head
-head_trainable = 0
-for p in model.classifier.parameters():
-    p.requires_grad = True
-    head_trainable += p.numel()
-
-# Print number of trainable parameters
+model = BertWithAdapters(checkpoint, num_labels, bottleneck_size)
+total_params = sum(p.numel() for p in model.bert.parameters())
 trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-accelerator.print(f"Froze backbone. Model now has {trainable_params:,} trainable parameters ({trainable_params/total_params:.2%})")
+accelerator.print(f"Loaded {model.__class__.__name__} with {num_labels} labels and {trainable_params:,} trainable parameters ({trainable_params/total_params:.2%})")
 
 # Load dataset
 glue = load_dataset("glue", task_name)
@@ -251,20 +217,7 @@ for epoch in range(n_epochs):
 # Save final model
 accelerator.wait_for_everyone()
 unwrapped = accelerator.unwrap_model(model)
-trainable = {n for n, p in unwrapped.named_parameters() if p.requires_grad}
-state_dict = unwrapped.state_dict()
-trainable_state_dict = {
-    n: t
-    for n, t in state_dict.items()
-    if n in trainable
-}
-unwrapped.save_pretrained(
-    model_save_path,
-    state_dict=trainable_state_dict,
-    save_function=accelerator.save,
-    safe_serialization=True
-)
-
+unwrapped.save_pretrained(model_save_path)
 accelerator.print(f"Model saved to {model_save_path}")
 
 # Flush trackers
