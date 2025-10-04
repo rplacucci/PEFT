@@ -1,0 +1,101 @@
+[
+	{
+		"task": "The Corpus of Linguistic Acceptability",
+		"alias": "cola",
+		"matthews_correlation": 53.0,
+		"accuracy": null,
+		"f1": null,
+		"pearson": null,
+		"spearmanr": null
+	},
+	{
+		"task": "The Stanford Sentiment Treebank",
+		"alias": "sst2",
+		"matthews_correlation": null,
+		"accuracy": 93.4,
+		"f1": null,
+		"pearson": null,
+		"spearmanr": null
+	},
+	{
+		"task": "Microsoft Research Paraphrase Corpus",
+		"alias": "mrpc",
+		"matthews_correlation": null,
+		"accuracy": 85.7,
+		"f1": 89.7,
+		"pearson": null,
+		"spearmanr": null
+	},
+	{
+		"task": "Semantic Textual Similarity Benchmark",
+		"alias": "stsb",
+		"matthews_correlation": null,
+		"accuracy": null,
+		"f1": null,
+		"pearson": 87.0,
+		"spearmanr": 85.7 
+	},
+	{
+		"task": "Quora Question Pairs",
+		"alias": "qqp",
+		"matthews_correlation": null,
+		"accuracy": 88.7,
+		"f1": 70.8,
+		"pearson": null,
+		"spearmanr": null
+	},
+	{
+		"task": "MultiNLI Matched",
+		"alias": "mnli-m",
+		"matthews_correlation": null,
+		"accuracy": 83.8,
+		"f1": null,
+		"pearson": null,
+		"spearmanr": null
+	},
+	{
+		"task": "MultiNLI Mismatched",
+		"alias": "mnli-mm",
+		"matthews_correlation": null,
+		"accuracy": 82.7,
+		"f1": null,
+		"pearson": null,
+		"spearmanr": null
+	},
+	{
+		"task": "Question NLI",
+		"alias": "qnli",
+		"matthews_correlation": null,
+		"accuracy": 90.7,
+		"f1": null,
+		"pearson": null,
+		"spearmanr": null
+	},
+	{
+		"task": "Recognizing Textual Entailment",
+		"alias": "rte",
+		"matthews_correlation": null,
+		"accuracy": 68.2,
+		"f1": null,
+		"pearson": null,
+		"spearmanr": null
+	},
+	{
+		"task": "Winograd NLI",
+		"alias": "wnli",
+		"matthews_correlation": null,
+		"accuracy": 65.1,
+		"f1": null,
+		"pearson": null,
+		"spearmanr": null
+	},
+	{
+		"task": "Diagnostics Main",
+		"alias": "ax",
+		"matthews_correlation": 34.5,
+		"accuracy": null,
+		"f1": null,
+		"pearson": null,
+		"spearmanr": null
+	}
+]
