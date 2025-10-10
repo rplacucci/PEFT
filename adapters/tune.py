@@ -113,19 +113,18 @@ valid_dataloader = DataLoader(
 metric = evaluate.load("glue", task_name)
 
 # Config optimizer (do not apply weight decay to bias or LayerNorm weights)
+no_decay = ["bias", "LayerNorm.weight"]
 optim_groups = [
     {
         "params": [
             p for n, p in model.named_parameters()
-            if p.requires_grad and "bias" not in n and "LayerNorm.weight" not in n
-        ],
+            if p.requires_grad and not any(nd in n for nd in no_decay)],
         "weight_decay": weight_decay,
     },
     {
         "params": [
             p for n, p in model.named_parameters()
-            if p.requires_grad and ("bias" in n or "LayerNorm.weight" in n)
-        ],
+            if p.requires_grad and any(nd in n for nd in no_decay)],
         "weight_decay": 0.0,
     },
 ]
