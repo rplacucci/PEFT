@@ -161,6 +161,10 @@ class BertWithLoRA(nn.Module):
                 if hasattr(m, "lora_B") and m.lora_B is not None:
                     for p in m.lora_B.parameters():
                         p.requires_grad = True
+
+        # Unfreeze classification head
+        for p in self.model.classifier.parameters():
+            p.requires_grad = True
     
     @torch.no_grad()
     def merge_lora_for_inference(self):
