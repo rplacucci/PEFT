@@ -20,7 +20,7 @@ logging.set_verbosity_error()
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # Config argparser
-parser = argparse.ArgumentParser(description="Fine-tune BERT on a GLUE task (adapters)")
+parser = argparse.ArgumentParser(description="Fine-tune BERT on a GLUE task (LoRA)")
 parser.add_argument("--checkpoint", type=str, default="bert-base-uncased", help="Checkpoint of pre-trained BERT model")
 parser.add_argument("--task_name", type=str, default="qqp", help="Name of the GLUE task to train on", choices=["mnli", "qqp", "qnli", "sst2", "cola", "stsb", "mrpc", "rte", "wnli"])
 parser.add_argument("--rank", type=int, default=8, help="Low-rank dimension of LoRA matrices")
