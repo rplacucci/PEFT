@@ -39,6 +39,7 @@ class LoRA(nn.Module):
         y = F.linear(x, self.weight, self.bias)
         if self.rank > 0:
             return y + self.scaling * self.lora_B(self.lora_A(x))
+        return y
 
     @torch.no_grad()
     def merge_lora(self):
@@ -108,7 +109,7 @@ class BertWithLoRA(nn.Module):
             checkpoint=checkpoint,
             num_labels=cfg.num_labels,
             rank=getattr(cfg, "lora_r", 8),
-            alpha=getattr(cfg, "lora_apha", 16),
+            alpha=getattr(cfg, "lora_alpha", 16),
             target_modules=getattr(
                 cfg, 
                 "target_modules", (
