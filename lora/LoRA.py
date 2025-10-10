@@ -24,11 +24,11 @@ class LoRA(nn.Module):
 
         # LoRA matrices
         if rank > 0:
-            self.matA = nn.Linear(self.in_features, self.rank, bias=False)
-            self.matB = nn.Linear(self.rank, self.out_features, bias=False)
+            self.lora_A = nn.Linear(self.in_features, self.rank, bias=False)
+            self.lora_B = nn.Linear(self.rank, self.out_features, bias=False)
             # Initialize parameter matrices
-            nn.init.normal_(self.matA.weight, mean=0.0, std=0.02)
-            nn.init.zeros_(self.matB.weight)
+            nn.init.normal_(self.lora_A.weight, mean=0.0, std=0.02)
+            nn.init.zeros_(self.lora_B.weight)
 
         # Freeze base weights
         self.weight.requires_grad_(False)
@@ -38,15 +38,15 @@ class LoRA(nn.Module):
     def forward(self, x):
         y = F.linear(x, self.weight, self.bias)
         if self.rank > 0:
-            return y + self.scaling * self.matB(self.matA(x))
+            return y + self.scaling * self.lora_B(self.lora_A(x))
 
     @torch.no_grad()
     def merge_lora(self):
         if self.rank > 0:
-            delta = self.matB.weight @ self.matA.weight
+            delta = self.lora_B.weight @ self.lora_A.weight
             self.weight.add_(self.scaling * delta)
-            self.matA.weight.zero_()
-            self.matB.weight.zero_()
+            self.lora_A.weight.zero_()
+            self.lora_B.weight.zero_()
 
 class BertWithLoRA(nn.Module):
     def __init__(
@@ -155,11 +155,11 @@ class BertWithLoRA(nn.Module):
         # Unfreeze LoRA parameters
         for n, m in self.model.named_modules():
             if isinstance(m, LoRA):
-                if hasattr(m, "matA") and m.matA is not None:
-                    for p in m.matA.parameters():
+                if hasattr(m, "lora_A") and m.lora_A is not None:
+                    for p in m.lora_A.parameters():
                         p.requires_grad = True
-                if hasattr(m, "matB") and m.matB is not None:
-                    for p in m.matB.parameters():
+                if hasattr(m, "lora_B") and m.lora_B is not None:
+                    for p in m.lora_B.parameters():
                         p.requires_grad = True
     
     @torch.no_grad()
