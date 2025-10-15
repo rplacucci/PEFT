@@ -224,7 +224,7 @@ for epoch in range(n_epochs):
 # Log experiment results
 if accelerator.is_main_process:
     results = {
-        "method": "adapters",
+        "method": "lora",
         "checkpoint": checkpoint,
         "run_id": run_id,
         "task_name": task_name,
