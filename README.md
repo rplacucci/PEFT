@@ -18,6 +18,73 @@ In that context, the goal of this project is to demonstrate the effectiveness of
 - Prompt Tuning *(coming soon)*
 - BitFit *(coming soon)*
 
+## 🏗️ Methods
+
+This implementation uses the **BERT Base encoder** (Devlin et al., 2019), a bidirectional Transformer pre-trained on masked language modeling and next-sentence predicition. BERT provides a strong general-purpose language representation, which can be efficiently adapted to downstream NLP tasks through fine-tuning. 
+
+To evaluate different adaptation strategies, all models are trained and tested on the **GLUE benchmark** (Wang et al., 2019), a collection of diverse sentence- and sentence-pair **classification tasks** designed to assess general language understanding and transfer ability. For each task, the final hidden state corresponding to the special `[CLS]` token is used as the aggregate representation of the input, which is then passed to a task-specific classification head.
+
+While full-parameter fine-tuning serves as the baseline, it scales poorly with the number of tasks due to its high parameter and storage costs. This work therefore explores a variety of parameter-efficient approaches, explained in detail below.
+
+### Adapters
+
+The core idea behing adapter-based fine-tuning (Houlsby et al., 2019) is to **insert small, trainable modules** (referred to as *adapters*) between the layers of a large pre-trained network such as BERT. Formally, adapter-based fine-tuning defines a new function:
+```math
+\psi_{\mathbf{w},\mathbf{v}}(\mathbf{x}) = \mathrm{Adapter}_\mathbf{v}(\phi_\mathbf{w}(\mathbf{x}))
+```
+where:
+- $\mathbf{w}$ are the original pre-trained parameters, kept *frozen* during training
+- $\mathbf{v}$ are newly introduced adapter parameters, initiliazed so that $\psi_{\mathbf{w},\mathbf{v}}(\mathbf{x}) \approx \phi_\mathbf{w}(\mathbf{x})$ at the start of training
+
+Only $\mathbf{v}$ are updated, while $\mathbf{w}$ remain fixed. This approach confers two key properties:
+- **Compactness:** If $\lvert\mathbf{v}\rvert \ll \lvert\mathbf{w}\rvert$, then the total number of trainable parameters per task is small. This allows storing many task-specific models with only a marginal increase over the base model’s size.
+- **Extensibility:** Because $\mathbf{w}$ are fixed, new adapters can be trained for additional tasks without affecting previously learned ones. The system can thus grow to accommodate new tasks *without retraining or interfering* with existing knowledge.
+
+Adapter modules are inserted into the Transformer architecture immediately after the attention and feedforward sublayers  before their residual connections. A **bottleneck architecture** is used to limit the number of parameters. The adapters *project* the original $d$-dimensional features into a smaller dimension $m$, apply a *non-linearity*, then project back to $d$ dimensions. An *internal residual connection* is implemented such that if the parameters of the projection layers are initialized to near-zero, the adapter itself is initialized to an approximate *identity function*—effectively allowing you to "disable" the adapter. Formally, an adapter module can be described as follows:
+```math
+\textrm{Adapter}(\mathbf{h}) = \mathbf{h} + \mathbf{W}_\mathrm{up}\sigma(\mathbf{W}_\mathrm{down}\mathbf{h})
+```
+where:
+- $\mathbf{h}\in\mathbb{R}^d$ denotes the hidden representation of any token at a given layer of the Transformer
+- $\mathbf{W}_\mathrm{down}\in\mathbb{R}^{m\times d}$ denotes the parameters of the linear down-projection layer
+- $\mathbf{W}_\mathrm{up}\in\mathbb{R}^{d\times m}$ denotes the parameters of the linear up-projection layer
+- $\sigma(\cdot)$ denotes the non-linearity (e.g. ReLU)
+
+### Low-Rank Adaptation
+
+Low-Rank Adaptation (Hu et al., 2022) fine-tunes large pre-trained models by constraining weight updates to a **low-dimensional subspace**, rather than directly updating all parameters. The key insight is that parameter updates in **over-parameterized models** often lie in a space of intrinsically **low rank**. Instead of modifying the full weight matrices, LoRA **introduces pairs of small trainable matrices that approximate these updates**, while keeping the original pretrained weights fixed.
+
+Formally, for a frozen weight matrix $W_0 \in \mathbb{R}^{d \times k}$, LoRA parameterizes its update as:
+```math
+W_0 + \Delta W = W_0 + BA
+```
+where:
+- $A \in \mathbb{R}^{r \times k}$ and $B \in \mathbb{R}^{d \times r}$ are trainable matrices
+- $r \ll \min(d, k)$ is the rank hyperparameter controlling the adaptation’s dimensionality.
+
+During fine-tuning, only $A$ and $B$ are optimized, while $W_0$ remains frozen. The modified forward pass for a dense layer with input $\mathbf{x}$ is given by:
+```math
+h = W_0x + \frac{\alpha}{r} \Delta Wx = W_0x + \frac{\alpha}{r} BAx
+```
+Here, $\alpha$ is a scaling factor introduced to reduce sensitivity to hyperparameter tuning across different ranks $r$. The matrix $A$ is initialized with a zero-mean Gaussian distribution, while $B$ is initialized to zero, ensuring that the initial update $\Delta W = BA = 0$.
+
+This formulation offers two key properties:
+- **A continuum between LoRA and full fine-tuning:** As $r$ increases toward the full rank of $W_0$, LoRA’s behavior approximates full fine-tuning.  
+- **Latency-free deployment:** During inference, the effective weight $W = W_0 + BA$ can be precomputed and cached. When switching tasks, $W_0$ remains constant—only the low-rank adapters $(A, B)$ need to be swapped, incurring minimal memory and computation overhead.
+
+LoRA can, in principle, be applied to any dense layer within a neural architecture. In Transformer-based models, this includes the projection matrices of the self-attention module ($W_q$, $W_k$, $W_v$, and $W_o$) as well as the two feed-forward (MLP) layers. 
+
+## 🔍 Implementation Details
+
+- The GLUE dataset was downloaded using the 🤗 `datasets` library from [https://huggingface.co/datasets/nyu-mll/glue](https://huggingface.co/datasets/nyu-mll/glue)
+- Inputs were prepared with `BertTokenizer.from_pretrained(checkpoint)` using truncation and attention-based masking
+- Batching was performed using `DataCollatorWithPadding` for dynamic padding to avoid wasted compute on padding tokens
+- The Adam optimizer and a linear decay learning rate scheduler with warm-up were used across all fine-tuning methods
+- Distributed training was achieved using the 🤗 `accelerate` library
+- Training and experiments were deployed in a system with 4xA100 Nvidia GPUs
+- `tensorboard` was used to log and monitor training progress
+- Modules for adapters and LoRA were written from scratch
+
 ## ⚙️ Installation
 
 **1. Clone the repository**
@@ -133,15 +200,18 @@ The following table summarizes the GLUE scores on the test set across different 
 | **Adapters**       | 32         | 1e-4, 1e-3             | 3, 20    | 64, 256         | ---   | ---           |
 | **Low-Rank**       | 32         | 1e-4, 5e-4             | 3, 20    | ---             | 4, 16 | Equal to rank |
 
-The following figure shows how validation accuracy ($\pm 3\sigma$) on MultiNLI (matched) varies as a function of the number of trainable parameters for different fine-tuning methods. Increasing the adapter bottleneck dimension (or equivalently the LoRA rank) monotonically improves performance until convergence near full fine-tuning levels, consistent with observations from Houlsby et al. (2019) and Hu et al. (2022). Both Adapters and LoRA achieve strong performance with orders of magnitude fewer trainable parameters, while fine-tuning the top-k encoder layers requires substantially more parameters to reach similar accuracy. This illustrates that PEFT methods scale more efficiently with parameter count, capturing most of the task-specific information through compact low-rank or modular updates.
+The following figure shows how validation accuracy ($\pm 3\sigma$) on MultiNLI (matched) varies as a function of the number of trainable parameters for different fine-tuning methods. Increasing the adapter bottleneck dimension (or equivalently the LoRA rank) monotonically improves performance until convergence near full fine-tuning levels, consistent with observations from Houlsby et al. (2019) and Hu et al. (2022). **Both Adapters and LoRA achieve strong performance with orders of magnitude fewer trainable parameters**, while fine-tuning the top-k encoder layers requires substantially more parameters to reach similar accuracy. This illustrates that PEFT methods scale more efficiently with parameter count, capturing most of the task-specific information through compact low-rank or modular updates.
 
 <img src="./outputs/mnli_experiments.png" width="750">
+
+**Note:** all experiments were conducted with the BERT base configuration.
 
 ## 🔮 Future Work
 
 - Add experiments for Prefix Tuning, Prompt Tuning, and BitFit
 - Train and evaluate other BERT configurations and other models
 - Extend experiments of performance versus parameters to other tasks
+- Compare from-scratch implementations of the PEFT methods with official 🤗 implementations
 
 ## 📚 References
 
