@@ -68,11 +68,11 @@ class GPT2WithPrefixTuning(nn.Module):
         self.prefix_len = prefix_len
         self.prefix_hidden_dim = prefix_hidden_dim
 
-        self.model = GPT2LMHeadModel.from_pretrained(checkpoint)
-        cfg = self.model.config
+        self.gpt2 = GPT2LMHeadModel.from_pretrained(checkpoint)
+        cfg = self.gpt2.config
 
         # Freeze GPT-2 params
-        for p in self.model.parameters():
+        for p in self.gpt2.parameters():
             p.requires_grad = False
 
         n_layers = cfg.n_layer
@@ -88,10 +88,6 @@ class GPT2WithPrefixTuning(nn.Module):
             prefix_len=prefix_len,
             hidden_dim=prefix_hidden_dim,
         )
-
-    @property
-    def gpt2(self):
-        return self.model.gpt2
     
     @property
     def trainable_params(self):
@@ -108,18 +104,10 @@ class GPT2WithPrefixTuning(nn.Module):
         prefix_mask = torch.ones((batch_size, self.prefix_len), device=device, dtype=attention_mask.dtype)
         attention_mask = torch.cat([prefix_mask, attention_mask], dim=1)
 
-        return self.model(
+        return self.gpt2(
             input_ids=input_ids,
             attention_mask=attention_mask,
             past_key_values=past_key_values,
             labels=labels,
             use_cache=False
         )
-        
-
-
-
-        
-    
-
-
